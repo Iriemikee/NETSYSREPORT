@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Weekly Report — SysAdmin Dashboard</title>
+<link rel="stylesheet" href="css/global.css">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+</head>
+<body>
+<div class="scanlines"></div>
+
+<nav class="navbar">
+  <div class="nav-logo">
+    <div class="nav-logo-icon"><span class="pulse-dot"></span>SD</div>
+    <div>
+      <div class="nav-title">SysAdmin Dashboard</div>
+      <div class="nav-sub" id="nav-clock"></div>
+    </div>
+  </div>
+  <div class="nav-links">
+    <a href="index.html" class="nav-link">Home</a>
+    <a href="daily.html" class="nav-link">Daily Report</a>
+    <a href="weekly.html" class="nav-link active">Weekly Report</a>
+    <a href="history.html" class="nav-link">History</a>
+  </div>
+  <div class="nav-status">
+    <span class="status-pill online">● SYSTEM ONLINE</span>
+  </div>
+</nav>
+
+<div class="page-layout">
+  <div class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-heading">Sections</div>
+      <a class="sidebar-item active" onclick="scrollTo2('w-overview')"><span class="sidebar-dot"></span> Overview</a>
+      <a class="sidebar-item" onclick="scrollTo2('w-charts')"><span class="sidebar-dot"></span> Charts</a>
+      <a class="sidebar-item" onclick="scrollTo2('w-incidents')"><span class="sidebar-dot"></span> Incidents</a>
+      <a class="sidebar-item" onclick="scrollTo2('w-days')"><span class="sidebar-dot"></span> Daily Breakdown</a>
+      <a class="sidebar-item" onclick="scrollTo2('w-summary')"><span class="sidebar-dot"></span> Summary</a>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-heading">Week Range</div>
+      <div style="padding:0 10px">
+        <div class="field-label" style="margin-bottom:4px">From</div>
+        <input type="date" class="field-input" id="week-from" style="margin-bottom:8px">
+        <div class="field-label" style="margin-bottom:4px">To</div>
+        <input type="date" class="field-input" id="week-to" style="margin-bottom:10px">
+        <button class="btn btn-outline btn-sm" style="width:100%" onclick="generateWeekly()">↻ Apply</button>
+      </div>
+    </div>
+  </div>
+
+  <main class="page-main">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Weekly <span>Master Report</span></div>
+        <div class="page-sub" id="week-range-label">Loading reports...</div>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-outline btn-sm" onclick="generateWeekly()">↻ Refresh</button>
+        <button class="btn btn-primary" onclick="exportWeeklyPDF()">⬇ Export PDF</button>
+      </div>
+    </div>
+
+    <!-- STATS -->
+    <div id="w-overview">
+      <div class="stats-grid" id="weekly-stats">
+        <div class="stat-card c-blue"><div class="stat-label">Reports Filed</div><div class="stat-value">—</div></div>
+        <div class="stat-card c-green"><div class="stat-label">Clean Days</div><div class="stat-value">—</div></div>
+        <div class="stat-card c-yellow"><div class="stat-label">Issue Days</div><div class="stat-value">—</div></div>
+        <div class="stat-card c-blue"><div class="stat-label">Backup Rate</div><div class="stat-value">—</div></div>
+        <div class="stat-card c-red"><div class="stat-label">Security Alerts</div><div class="stat-value">—</div></div>
+      </div>
+    </div>
+
+    <!-- CHARTS -->
+    <div id="w-charts">
+      <div class="chart-box">
+        <div class="chart-title">SERVER STATUS — DAILY OVERVIEW</div>
+        <canvas id="serverChart" height="80"></canvas>
+      </div>
+      <div class="chart-box">
+        <div class="chart-title">BACKUP COMPLETION RATE — DAILY</div>
+        <canvas id="backupChart" height="80"></canvas>
+      </div>
+    </div>
+
+    <!-- INCIDENTS -->
+    <div id="w-incidents" style="margin-bottom:24px">
+      <div class="section-label" style="margin-bottom:12px">Incidents &amp; Alerts</div>
+      <div id="incidents-content"></div>
+    </div>
+
+    <!-- DAILY BREAKDOWN -->
+    <div id="w-days" style="margin-bottom:24px">
+      <div class="section-label" style="margin-bottom:12px">Daily Breakdown</div>
+      <div id="days-content"></div>
+    </div>
+
+    <!-- SUMMARY TEXT -->
+    <div id="w-summary">
+      <div class="section-label" style="margin-bottom:12px">Generated Summary</div>
+      <div id="summary-content" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;font-family:var(--mono);font-size:12px;line-height:1.9;color:var(--text-dim);white-space:pre-wrap">
+        No reports loaded yet. Save daily reports first, then click Refresh.
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="js/global.js"></script>
+<script>
+let serverChart, backupChart;
+let currentReports = [];
+
+// Init date range (current week Mon–Sun)
+function initWeekRange() {
+  const now = new Date();
+  const day = now.getDay();
+  const mon = new Date(now); mon.setDate(now.getDate() - (day === 0 ? 6 : day - 1));
+  const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+  document.getElementById('week-from').value = mon.toISOString().slice(0,10);
+  document.getElementById('week-to').value = sun.toISOString().slice(0,10);
+}
+
+initWeekRange();
+
+async function generateWeekly() {
+  const from = document.getElementById('week-from').value;
+  const to = document.getElementById('week-to').value;
+
+  let reports = await loadAllReports();
+  if (from && to) {
+    reports = reports.filter(r => r.date >= from && r.date <= to);
+  } else {
+    reports = reports.slice(0, 7);
+  }
+
+  reports.sort((a,b) => a.date.localeCompare(b.date));
+  currentReports = reports;
+
+  if (!reports.length) {
+    document.getElementById('week-range-label').textContent = 'No reports found for this range';
+    document.getElementById('summary-content').textContent = 'No reports found. Save daily reports first.';
+    return;
+  }
+
+  const dateRange = reports.length > 1
+    ? `${formatDate(reports[0].date)} – ${formatDate(reports[reports.length-1].date)}`
+    : formatDate(reports[0].date);
+  document.getElementById('week-range-label').textContent = dateRange;
+
+  buildStats(reports);
+  buildCharts(reports);
+  buildIncidents(reports);
+  buildDays(reports);
+  buildSummary(reports);
+}
+
+function buildStats(reports) {
+  const totalBk = reports.reduce((a,r) => a+(r.backups?.length||0), 0);
+  const doneBk = reports.reduce((a,r) => a+(r.backups?.filter(b=>b[1]==='Completed').length||0), 0);
+  const rate = totalBk ? Math.round((doneBk/totalBk)*100) : 0;
+  const secAlerts = reports.reduce((a,r) => {
+    return a + (r.security?.filter(s => {
+      const n=(s[1]||'').trim().toLowerCase();
+      return n && !['no notes','no alerts','none',''].includes(n);
+    }).length||0);
+  }, 0);
+  const clean = reports.filter(r=>!checkIssues(r)).length;
+
+  document.getElementById('weekly-stats').innerHTML = `
+    <div class="stat-card c-blue"><div class="stat-label">Reports Filed</div><div class="stat-value">${reports.length}</div></div>
+    <div class="stat-card c-green"><div class="stat-label">Clean Days</div><div class="stat-value">${clean}</div></div>
+    <div class="stat-card c-yellow"><div class="stat-label">Issue Days</div><div class="stat-value">${reports.length-clean}</div></div>
+    <div class="stat-card c-blue"><div class="stat-label">Backup Rate</div><div class="stat-value">${rate}%</div></div>
+    <div class="stat-card c-red"><div class="stat-label">Security Alerts</div><div class="stat-value">${secAlerts}</div></div>
+  `;
+}
+
+function buildCharts(reports) {
+  const labels = reports.map(r => formatDateShort(r.date));
+  const serverOk = reports.map(r => r.servers?.filter(s=>s[1]==='Normal').length||0);
+  const serverBad = reports.map(r => r.servers?.filter(s=>['Warning','Critical','Offline'].includes(s[1])).length||0);
+  const bkOk = reports.map(r => r.backups?.filter(b=>b[1]==='Completed').length||0);
+  const bkFail = reports.map(r => r.backups?.filter(b=>b[1]==='Failed').length||0);
+
+  const chartOpts = {
+    responsive: true,
+    plugins: { legend: { labels: { color: '#7a9ab8', font: { family: 'Share Tech Mono', size: 11 } } } },
+    scales: {
+      x: { grid: { color: '#1a2d45' }, ticks: { color: '#4d6480', font: { family: 'Share Tech Mono', size: 11 } } },
+      y: { grid: { color: '#1a2d45' }, ticks: { color: '#4d6480', font: { family: 'Share Tech Mono', size: 11 } }, beginAtZero: true }
+    }
+  };
+
+  if (serverChart) serverChart.destroy();
+  if (backupChart) backupChart.destroy();
+
+  serverChart = new Chart(document.getElementById('serverChart'), {
+    type: 'bar',
+    data: { labels, datasets: [
+      { label: 'Normal', data: serverOk, backgroundColor: 'rgba(0,255,163,0.5)', borderColor: '#00ffa3', borderWidth: 1 },
+      { label: 'Issues', data: serverBad, backgroundColor: 'rgba(255,68,85,0.5)', borderColor: '#ff4455', borderWidth: 1 }
+    ]},
+    options: { ...chartOpts, scales: { ...chartOpts.scales, x: { ...chartOpts.scales.x, stacked: true }, y: { ...chartOpts.scales.y, stacked: true } } }
+  });
+
+  backupChart = new Chart(document.getElementById('backupChart'), {
+    type: 'bar',
+    data: { labels, datasets: [
+      { label: 'Completed', data: bkOk, backgroundColor: 'rgba(0,200,255,0.5)', borderColor: '#00c8ff', borderWidth: 1 },
+      { label: 'Failed', data: bkFail, backgroundColor: 'rgba(255,184,0,0.5)', borderColor: '#ffb800', borderWidth: 1 }
+    ]},
+    options: chartOpts
+  });
+}
+
+function buildIncidents(reports) {
+  const serverIssues = [];
+  const secAlerts = [];
+  reports.forEach(r => {
+    r.servers?.forEach(s => { if(['Warning','Critical','Offline'].includes(s[1])) serverIssues.push({date:r.date,...{loc:s[0],status:s[1],notes:s[2]||''}}); });
+    r.security?.forEach(s => {
+      const n=(s[1]||'').trim().toLowerCase();
+      if(n && !['no notes','no alerts','none',''].includes(n)) secAlerts.push({date:r.date,loc:s[0],notes:s[1]});
+    });
+  });
+
+  let html = '';
+  if (serverIssues.length) {
+    html += `<div class="card" style="margin-bottom:12px">
+      <div class="card-header"><span class="card-tag" style="background:rgba(255,68,85,0.1);color:var(--danger);border-color:rgba(255,68,85,0.2)">SERVERS</span><span class="card-title">Server Incidents</span></div>
+      <table class="table-editor"><thead><tr><th>Date</th><th>Location</th><th>Status</th><th>Notes</th></tr></thead><tbody>
+      ${serverIssues.map((i,ri) => `<tr><td class="row-label">${formatDateShort(i.date)}</td><td><span style="font-size:12px">${i.loc}</span></td><td><span class="badge badge-warn">${i.status}</span></td><td>${i.notes||'—'}</td></tr>`).join('')}
+      </tbody></table></div>`;
+  }
+
+  if (secAlerts.length) {
+    html += `<div class="card">
+      <div class="card-header"><span class="card-tag" style="background:rgba(255,184,0,0.1);color:var(--warn);border-color:rgba(255,184,0,0.2)">SECURITY</span><span class="card-title">Security Alerts</span></div>
+      <table class="table-editor"><thead><tr><th>Date</th><th>Location</th><th>Notes</th></tr></thead><tbody>
+      ${secAlerts.map(a => `<tr><td class="row-label">${formatDateShort(a.date)}</td><td>${a.loc}</td><td>${a.notes}</td></tr>`).join('')}
+      </tbody></table></div>`;
+  }
+
+  if (!html) {
+    html = `<div class="card"><div style="color:var(--accent2);font-family:var(--mono);font-size:12px;padding:4px 0">✓ No incidents or security alerts this period.</div></div>`;
+  }
+
+  document.getElementById('incidents-content').innerHTML = html;
+}
+
+function buildDays(reports) {
+  const reversed = [...reports].reverse();
+  document.getElementById('days-content').innerHTML = reversed.map(r => {
+    const issues = checkIssues(r);
+    const secA = r.security?.filter(s => { const n=(s[1]||'').trim().toLowerCase(); return n && !['no notes','no alerts','none',''].includes(n); }) || [];
+    return `<div class="history-card" onclick="window.location='daily.html'">
+      <div class="history-card-header">
+        <div class="history-card-title">${formatDate(r.date)}</div>
+        <span class="badge ${issues?'badge-warn':'badge-ok'}">${issues?'Issues Found':'All Clear'}</span>
+      </div>
+      <div class="history-card-meta">
+        <span class="badge badge-info">By ${r.preparedBy||'N/A'}</span>
+        <span class="badge ${r.servers?.every(s=>s[1]==='Normal')?'badge-ok':'badge-warn'}">${r.servers?.filter(s=>s[1]==='Normal').length||0}/${r.servers?.length||0} Servers OK</span>
+        <span class="badge ${r.backups?.every(b=>b[1]==='Completed')?'badge-ok':'badge-warn'}">${r.backups?.filter(b=>b[1]==='Completed').length||0}/${r.backups?.length||0} Backups OK</span>
+        ${secA.length ? `<span class="badge badge-warn">⚠ ${secA.length} Security Alert${secA.length>1?'s':''}</span>` : ''}
+      </div>
+      ${r.summaryNotes ? `<div style="margin-top:10px;font-size:12px;color:var(--text-muted);padding:8px 12px;background:var(--surface2);border-radius:4px;border-left:3px solid var(--accent)">${r.summaryNotes}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function buildSummary(reports) {
+  const totalBk = reports.reduce((a,r)=>a+(r.backups?.length||0),0);
+  const doneBk = reports.reduce((a,r)=>a+(r.backups?.filter(b=>b[1]==='Completed').length||0),0);
+  const rate = totalBk ? Math.round((doneBk/totalBk)*100) : 0;
+  const dateRange = reports.length>1
+    ? `${formatDate(reports[0].date)} to ${formatDate(reports[reports.length-1].date)}`
+    : formatDate(reports[0].date);
+
+  const serverIssues=[], secAlerts=[], actions=[];
+  reports.forEach(r => {
+    r.servers?.forEach(s => { if(['Warning','Critical','Offline'].includes(s[1])) serverIssues.push(`${s[0]} (${s[1]}${s[2]?' - '+s[2]:''})`); });
+    r.security?.forEach(s => { const n=(s[1]||'').trim().toLowerCase(); if(n && !['no notes','no alerts','none',''].includes(n)) secAlerts.push(`${s[0]}: ${s[1]}`); });
+    if(r.nextActions) actions.push(`[${formatDateShort(r.date)}] ${r.nextActions}`);
+  });
+
+  let txt = `WEEKLY IT MASTER REPORT\n${dateRange}\nPrepared by: ${reports[0]?.preparedBy||'N/A'}\nGenerated: ${new Date().toLocaleString()}\n${'─'.repeat(60)}\n\n`;
+  txt += `OVERVIEW\nReports Filed: ${reports.length} of 5 working days\nBackup Success Rate: ${rate}% (${doneBk}/${totalBk} tasks)\nDays Without Issues: ${reports.filter(r=>!checkIssues(r)).length}/${reports.length}\n\n`;
+
+  if(serverIssues.length) { txt += `SERVER INCIDENTS\n`; serverIssues.forEach(i=>txt+=`  • ${i}\n`); txt+='\n'; }
+  else txt += `SERVER STATUS\n  All servers operated normally throughout the week.\n\n`;
+
+  if(secAlerts.length) { txt += `SECURITY ALERTS\n`; secAlerts.forEach(a=>txt+=`  • ${a}\n`); txt+='\n'; }
+  else txt += `SECURITY\n  No significant security alerts this week.\n\n`;
+
+  if(actions.length) { txt += `OUTSTANDING ACTIONS\n${actions.join('\n')}\n\n`; }
+
+  txt += `${'─'.repeat(60)}\nEnd of Weekly Master Report`;
+  document.getElementById('summary-content').textContent = txt;
+}
+
+// ---- EXPORT PDF ----
+function exportWeeklyPDF() {
+  if (!currentReports.length) { showToast('Generate the report first!', true); return; }
+  const reports = currentReports;
+
+  const dateRange = reports.length>1
+    ? `${formatDate(reports[0].date)} – ${formatDate(reports[reports.length-1].date)}`
+    : formatDate(reports[0].date);
+
+  const totalBk = reports.reduce((a,r)=>a+(r.backups?.length||0),0);
+  const doneBk = reports.reduce((a,r)=>a+(r.backups?.filter(b=>b[1]==='Completed').length||0),0);
+  const rate = totalBk ? Math.round((doneBk/totalBk)*100) : 0;
+  const clean = reports.filter(r=>!checkIssues(r)).length;
+
+  const serverIssues=[], secAlerts=[], actions=[];
+  reports.forEach(r => {
+    r.servers?.forEach(s => { if(['Warning','Critical','Offline'].includes(s[1])) serverIssues.push({date:r.date,loc:s[0],status:s[1],notes:s[2]||''}); });
+    r.security?.forEach(s => { const n=(s[1]||'').trim().toLowerCase(); if(n && !['no notes','no alerts','none',''].includes(n)) secAlerts.push({date:r.date,loc:s[0],notes:s[1]}); });
+    if(r.nextActions) actions.push({date:r.date,text:r.nextActions});
+  });
+
+  function tbl(hdrs, rows) {
+    const ths = hdrs.map(h=>`<th>${h}</th>`).join('');
+    const trs = (rows||[]).map((r,i)=>`<tr class="${i%2===0?'even':''}">${r.map(c=>{
+      const v=(c||'').toLowerCase();
+      if(['normal','completed','verified','confirmed'].includes(v)) return `<td><span class="bok">${c}</span></td>`;
+      if(['warning','partial'].includes(v)) return `<td><span class="bwarn">${c}</span></td>`;
+      if(['critical','offline','failed'].includes(v)) return `<td><span class="bcrit">${c}</span></td>`;
+      return `<td>${c||'—'}</td>`;
+    }).join('')}</tr>`).join('');
+    return `<table><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table>`;
+  }
+
+  const daysSections = reports.map(r => {
+    const iss = checkIssues(r);
+    const secA = r.security?.filter(s=>{const n=(s[1]||'').trim().toLowerCase();return n && !['no notes','no alerts','none',''].includes(n);})||[];
+    return `<div class="day">
+      <div class="day-hdr"><span>${formatDate(r.date)}</span><span class="${iss?'bwarn':'bok'}">${iss?'Issues Found':'All Clear'}</span></div>
+      <div class="day-meta">By: <b>${r.preparedBy||'N/A'}</b> | Servers: ${r.servers?.filter(s=>s[1]==='Normal').length||0}/${r.servers?.length||0} OK | Backups: ${r.backups?.filter(b=>b[1]==='Completed').length||0}/${r.backups?.length||0} OK${secA.length?` | <span style="color:#b45309">⚠ ${secA.length} Alert${secA.length>1?'s':''}</span>`:''}</div>
+      <h4>Servers</h4>${tbl(['Location','Status','Notes'],r.servers)}
+      <h4>Backups</h4>${tbl(['Location / Task','Status','Notes'],r.backups)}
+      <h4>Security</h4>${tbl(['Location','Notes'],r.security)}
+      <h4>Network</h4>${tbl(['Task','Location','Status','Notes'],r.network)}
+      <h4>Surveillance</h4>${tbl(['Location','Notes'],r.surveillance)}
+      ${r.summaryNotes?`<h4>Summary</h4><div class="nb">${r.summaryNotes.replace(/\n/g,'<br>')}</div>`:''}
+      ${r.nextActions?`<h4>Next Actions</h4><div class="nb">${r.nextActions.replace(/\n/g,'<br>')}</div>`:''}
+    </div>`;
+  }).join('');
+
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<title>Weekly IT Report</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:Arial,sans-serif;font-size:12px;color:#111;padding:32px;max-width:960px;margin:auto}
+  h1{font-size:22px;color:#003366;margin-bottom:4px}
+  .meta{color:#555;font-size:12px;margin-bottom:24px}
+  .stats{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:28px}
+  .sbox{border:1px solid #dde;border-radius:6px;padding:12px;text-align:center}
+  .sbox .n{font-size:26px;font-weight:bold;margin-bottom:3px}
+  .sbox .l{font-size:9px;color:#666;text-transform:uppercase;letter-spacing:.05em}
+  .sbox.blue .n{color:#003366}.sbox.green .n{color:#166534}.sbox.yellow .n{color:#b45309}.sbox.red .n{color:#dc2626}
+  h2{font-size:14px;color:#003366;border-bottom:2px solid #003366;padding-bottom:4px;margin:24px 0 12px;text-transform:uppercase;letter-spacing:.05em}
+  h4{font-size:10px;color:#666;text-transform:uppercase;letter-spacing:.05em;margin:12px 0 5px}
+  table{width:100%;border-collapse:collapse;margin-bottom:10px;font-size:11px}
+  th{background:#003366;color:#fff;padding:6px 8px;text-align:left}
+  td{padding:5px 8px;border-bottom:1px solid #eee;vertical-align:top}
+  tr.even td{background:#f8fafc}
+  .bok{background:#dcfce7;color:#166534;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:bold}
+  .bwarn{background:#fef3c7;color:#b45309;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:bold}
+  .bcrit{background:#fee2e2;color:#991b1b;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:bold}
+  .day{border:1px solid #dde;border-radius:6px;padding:16px;margin-bottom:14px;break-inside:avoid}
+  .day-hdr{display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:bold;color:#003366;margin-bottom:5px}
+  .day-meta{font-size:11px;color:#555;margin-bottom:10px}
+  .nb{background:#f8fafc;border-left:3px solid #003366;padding:8px 12px;margin-bottom:8px;font-size:11px;line-height:1.6;white-space:pre-wrap}
+  .footer{margin-top:32px;border-top:1px solid #dde;padding-top:10px;font-size:10px;color:#aaa;text-align:center}
+  @media print{body{padding:16px}.day{break-inside:avoid}}
+</style></head><body>
+<h1>Weekly IT Master Report</h1>
+<div class="meta">
+  <b>Period:</b> ${dateRange} &nbsp;|&nbsp;
+  <b>Prepared by:</b> ${reports[0]?.preparedBy||'N/A'} &nbsp;|&nbsp;
+  <b>Generated:</b> ${new Date().toLocaleString()}
+</div>
+<h2>Weekly Overview</h2>
+<div class="stats">
+  <div class="sbox blue"><div class="n">${reports.length}</div><div class="l">Reports Filed</div></div>
+  <div class="sbox green"><div class="n">${clean}</div><div class="l">Clean Days</div></div>
+  <div class="sbox yellow"><div class="n">${reports.length-clean}</div><div class="l">Issue Days</div></div>
+  <div class="sbox blue"><div class="n">${rate}%</div><div class="l">Backup Rate</div></div>
+  <div class="sbox red"><div class="n">${secAlerts.length}</div><div class="l">Security Alerts</div></div>
+</div>
+${serverIssues.length ? `<h2>Server Incidents</h2>${tbl(['Date','Location','Status','Notes'],serverIssues.map(i=>[formatDateShort(i.date),i.loc,i.status,i.notes]))}` : `<h2>Servers</h2><div class="nb">✓ All servers operated normally.</div>`}
+${secAlerts.length ? `<h2>Security Alerts</h2>${tbl(['Date','Location','Notes'],secAlerts.map(a=>[formatDateShort(a.date),a.loc,a.notes]))}` : `<h2>Security</h2><div class="nb">✓ No security alerts this week.</div>`}
+${actions.length ? `<h2>Outstanding Actions</h2>${actions.map(a=>`<div class="nb"><b>${formatDateShort(a.date)}:</b><br>${a.text.replace(/\n/g,'<br>')}</div>`).join('')}` : ''}
+<h2>Daily Breakdown</h2>
+${daysSections}
+<div class="footer">SysAdmin Dashboard · Weekly Master Report · ${new Date().toLocaleString()}</div>
+<script>window.onload=()=>window.print()<\/script>
+</body></html>`;
+
+  const win = window.open('','_blank');
+  if (win) { win.document.write(html); win.document.close(); }
+  else { downloadDataURI(`IT_Weekly_${new Date().toISOString().slice(0,10)}.html`, 'text/html', html); showToast('Downloaded (popup blocked)'); }
+}
+
+function scrollTo2(id) {
+  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// Auto-generate on load
+generateWeekly();
+</script>
+</body>
+</html>

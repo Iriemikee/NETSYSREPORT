@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SysAdmin Dashboard</title>
+<link rel="stylesheet" href="css/global.css">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<!-- SCANLINE OVERLAY -->
+<div class="scanlines"></div>
+
+<!-- NAV -->
+<nav class="navbar">
+  <div class="nav-logo">
+    <div class="nav-logo-icon">
+      <span class="pulse-dot"></span>
+      SD
+    </div>
+    <div>
+      <div class="nav-title">SysAdmin Dashboard</div>
+      <div class="nav-sub" id="nav-clock"></div>
+    </div>
+  </div>
+  <div class="nav-links">
+    <a href="index.html" class="nav-link active">Home</a>
+    <a href="daily.html" class="nav-link">Daily Report</a>
+    <a href="weekly.html" class="nav-link">Weekly Report</a>
+    <a href="history.html" class="nav-link">History</a>
+  </div>
+  <div class="nav-status">
+    <span class="status-pill online">● SYSTEM ONLINE</span>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-grid-bg"></div>
+  <div class="hero-content">
+    <div class="hero-eyebrow">Network &amp; Infrastructure</div>
+    <h1 class="hero-title">SysAdmin<br><span class="hero-accent">Dashboard</span></h1>
+    <p class="hero-desc">Centralized daily reporting, weekly analytics, and permanent history archive for your IT infrastructure.</p>
+    <div class="hero-actions">
+      <a href="daily.html" class="btn btn-primary">+ New Daily Report</a>
+      <a href="weekly.html" class="btn btn-outline">View Weekly Report</a>
+    </div>
+  </div>
+  <div class="hero-terminals">
+    <div class="terminal-card" style="animation-delay:0s">
+      <div class="terminal-header"><span class="t-dot red"></span><span class="t-dot yellow"></span><span class="t-dot green"></span><span class="t-label">server_status.log</span></div>
+      <div class="terminal-body">
+        <div class="t-line"><span class="t-ok">[OK]</span> Automotive Art ........... ONLINE</div>
+        <div class="t-line"><span class="t-ok">[OK]</span> Buccaneer Beach Club ...... ONLINE</div>
+        <div class="t-line"><span class="t-ok">[OK]</span> TropicWear ................ ONLINE</div>
+        <div class="t-line t-blink"><span class="t-warn">[--]</span> <span class="t-cursor">_</span></div>
+      </div>
+    </div>
+    <div class="terminal-card" style="animation-delay:0.15s">
+      <div class="terminal-header"><span class="t-dot red"></span><span class="t-dot yellow"></span><span class="t-dot green"></span><span class="t-label">backup_tasks.log</span></div>
+      <div class="terminal-body">
+        <div class="t-line"><span class="t-ok">[OK]</span> LOCAL Automotive Art ...... DONE</div>
+        <div class="t-line"><span class="t-ok">[OK]</span> S2S → Outdoor World ....... DONE</div>
+        <div class="t-line"><span class="t-ok">[OK]</span> LOCAL TropicWear .......... DONE</div>
+        <div class="t-line"><span class="t-ok">[OK]</span> S2S → Automotive Art ...... DONE</div>
+      </div>
+    </div>
+    <div class="terminal-card" style="animation-delay:0.3s">
+      <div class="terminal-header"><span class="t-dot red"></span><span class="t-dot yellow"></span><span class="t-dot green"></span><span class="t-label">network.log</span></div>
+      <div class="terminal-body">
+        <div class="t-line"><span class="t-ok">[OK]</span> Firewall .................. ACTIVE</div>
+        <div class="t-line"><span class="t-ok">[OK]</span> Gateway ................... ONLINE</div>
+        <div class="t-line"><span class="t-ok">[OK]</span> Wi-Fi APs ................. UP</div>
+        <div class="t-line"><span class="t-ok">[OK]</span> NVR / Cameras ............. OK</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- QUICK STATS -->
+<section class="section">
+  <div class="section-inner">
+    <div class="section-label">Quick Access</div>
+    <div class="quick-grid">
+      <a href="daily.html" class="quick-card">
+        <div class="quick-icon">📋</div>
+        <div class="quick-title">Daily Report</div>
+        <div class="quick-desc">Fill in today's server, backup, security, network and surveillance status.</div>
+        <div class="quick-arrow">→</div>
+      </a>
+      <a href="weekly.html" class="quick-card">
+        <div class="quick-icon">📊</div>
+        <div class="quick-title">Weekly Master</div>
+        <div class="quick-desc">Auto-generated weekly summary with charts and issue tracking.</div>
+        <div class="quick-arrow">→</div>
+      </a>
+      <a href="history.html" class="quick-card">
+        <div class="quick-icon">🗂</div>
+        <div class="quick-title">Report History</div>
+        <div class="quick-desc">Full archive of every saved daily report, searchable and exportable.</div>
+        <div class="quick-arrow">→</div>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- SETUP NOTICE -->
+<section class="section">
+  <div class="section-inner">
+    <div class="setup-banner" id="setup-banner">
+      <div class="setup-icon">⚙️</div>
+      <div class="setup-text">
+        <div class="setup-title">Google Sheets sync not configured</div>
+        <div class="setup-desc">To save reports permanently and access them from any device, connect your Google Sheet. Takes 5 minutes.</div>
+      </div>
+      <a href="settings.html" class="btn btn-outline btn-sm">Configure →</a>
+    </div>
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="footer-inner">
+    <div class="footer-logo">SysAdmin Dashboard</div>
+    <div class="footer-copy">Built for Michael Marsh · IT Network &amp; System Administration</div>
+  </div>
+</footer>
+
+<script src="js/global.js"></script>
+<script>
+  // Check if sheets configured
+  const url = localStorage.getItem('sheets_url');
+  if (url) document.getElementById('setup-banner').style.display = 'none';
+</script>
+</body>
+</html>

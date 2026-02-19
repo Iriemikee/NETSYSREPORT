@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Report History — SysAdmin Dashboard</title>
+<link rel="stylesheet" href="css/global.css">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<div class="scanlines"></div>
+
+<nav class="navbar">
+  <div class="nav-logo">
+    <div class="nav-logo-icon"><span class="pulse-dot"></span>SD</div>
+    <div>
+      <div class="nav-title">SysAdmin Dashboard</div>
+      <div class="nav-sub" id="nav-clock"></div>
+    </div>
+  </div>
+  <div class="nav-links">
+    <a href="index.html" class="nav-link">Home</a>
+    <a href="daily.html" class="nav-link">Daily Report</a>
+    <a href="weekly.html" class="nav-link">Weekly Report</a>
+    <a href="history.html" class="nav-link active">History</a>
+  </div>
+  <div class="nav-status">
+    <span class="status-pill online">● SYSTEM ONLINE</span>
+  </div>
+</nav>
+
+<div class="page-layout">
+  <div class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-heading">Filter</div>
+      <div style="padding:0 10px">
+        <div class="field-label" style="margin-bottom:4px">Search</div>
+        <input type="text" class="field-input" id="search-input" placeholder="Search notes..." style="margin-bottom:10px" oninput="filterReports()">
+        <div class="field-label" style="margin-bottom:4px">From Date</div>
+        <input type="date" class="field-input" id="filter-from" style="margin-bottom:8px" onchange="filterReports()">
+        <div class="field-label" style="margin-bottom:4px">To Date</div>
+        <input type="date" class="field-input" id="filter-to" style="margin-bottom:10px" onchange="filterReports()">
+        <div class="field-label" style="margin-bottom:4px">Status</div>
+        <select class="status-select" id="filter-status" style="width:100%;margin-bottom:10px" onchange="filterReports()">
+          <option value="">All Reports</option>
+          <option value="clean">Clean Only</option>
+          <option value="issues">Issues Only</option>
+        </select>
+        <button class="btn btn-outline btn-sm" style="width:100%" onclick="clearFilters()">✕ Clear Filters</button>
+      </div>
+    </div>
+    <div class="sidebar-section" style="border-top:1px solid var(--border);padding-top:16px;margin-top:4px">
+      <div class="sidebar-heading">Actions</div>
+      <div style="padding:0 10px;display:flex;flex-direction:column;gap:8px">
+        <button class="btn btn-outline btn-sm" onclick="exportAllCSV()">⬇ Export All CSV</button>
+        <button class="btn btn-danger btn-sm" onclick="clearAll()">✕ Clear All</button>
+      </div>
+    </div>
+  </div>
+
+  <main class="page-main">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Report <span>History</span></div>
+        <div class="page-sub" id="history-count">Loading...</div>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-outline btn-sm" onclick="refreshHistory()">↻ Refresh</button>
+        <button class="btn btn-primary btn-sm" onclick="window.location='daily.html'">+ New Report</button>
+      </div>
+    </div>
+
+    <div id="history-list"></div>
+  </main>
+</div>
+
+<!-- DETAIL MODAL -->
+<div class="modal-overlay" id="detail-modal">
+  <div class="modal" style="width:700px">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-title">Report Detail</div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div id="modal-body"></div>
+    <div class="btn-group" style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
+      <button class="btn btn-primary btn-sm" onclick="loadAndEdit()">✏ Edit This Report</button>
+      <button class="btn btn-outline btn-sm" onclick="exportModalReport()">⬇ Export PDF</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteModalReport()">✕ Delete</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/global.js"></script>
+<script>
+let allReports = [];
+let filteredReports = [];
+let currentModal = null;
+
+async function refreshHistory() {
+  allReports = await loadAllReports();
+  allReports.sort((a,b) => b.date.localeCompare(a.date));
+  filterReports();
+}
+
+function filterReports() {
+  const search = document.getElementById('search-input').value.toLowerCase();
+  const from = document.getElementById('filter-from').value;
+  const to = document.getElementById('filter-to').value;
+  const status = document.getElementById('filter-status').value;
+
+  filteredReports = allReports.filter(r => {
+    if (from && r.date < from) return false;
+    if (to && r.date > to) return false;
+    if (status === 'clean' && checkIssues(r)) return false;
+    if (status === 'issues' && !checkIssues(r)) return false;
+    if (search) {
+      const blob = JSON.stringify(r).toLowerCase();
+      if (!blob.includes(search)) return false;
+    }
+    return true;
+  });
+
+  renderList();
+}
+
+function clearFilters() {
+  document.getElementById('search-input').value = '';
+  document.getElementById('filter-from').value = '';
+  document.getElementById('filter-to').value = '';
+  document.getElementById('filter-status').value = '';
+  filterReports();
+}
+
+function renderList() {
+  const el = document.getElementById('history-list');
+  document.getElementById('history-count').textContent = `${filteredReports.length} report${filteredReports.length !== 1 ? 's' : ''} found`;
+
+  if (!filteredReports.length) {
+    el.innerHTML = `<div style="color:var(--text-muted);font-family:var(--mono);font-size:13px;padding:40px 0;text-align:center">
+      No reports found.<br><br>
+      <a href="daily.html" class="btn btn-primary btn-sm">+ Create First Report</a>
+    </div>`;
+    return;
+  }
+
+  el.innerHTML = filteredReports.map(r => {
+    const issues = checkIssues(r);
+    const secAlerts = r.security?.filter(s => {
+      const n=(s[1]||'').trim().toLowerCase();
+      return n && !['no notes','no alerts','none',''].includes(n);
+    }) || [];
+    const bkFailed = r.backups?.filter(b=>b[1]==='Failed') || [];
+
+    return `<div class="history-card" onclick="openDetail('${r.date}')">
+      <div class="history-card-header">
+        <div class="history-card-title">📋 ${formatDate(r.date)}</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span class="badge ${issues?'badge-warn':'badge-ok'}">${issues?'Issues Found':'All Clear'}</span>
+          <button class="btn btn-outline btn-sm" onclick="event.stopPropagation();exportSinglePDF('${r.date}')">⬇ PDF</button>
+          <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteReport('${r.date}')">✕</button>
+        </div>
+      </div>
+      <div class="history-card-meta" style="margin-top:8px">
+        <span class="badge badge-info">By ${r.preparedBy||'N/A'}</span>
+        <span class="badge badge-info">Saved ${r.savedAt ? new Date(r.savedAt).toLocaleTimeString() : 'N/A'}</span>
+        <span class="badge ${r.servers?.every(s=>s[1]==='Normal')?'badge-ok':'badge-warn'}">${r.servers?.filter(s=>s[1]==='Normal').length||0}/${r.servers?.length||0} Servers OK</span>
+        <span class="badge ${r.backups?.every(b=>b[1]==='Completed')?'badge-ok':'badge-warn'}">${r.backups?.filter(b=>b[1]==='Completed').length||0}/${r.backups?.length||0} Backups OK</span>
+        ${secAlerts.length ? `<span class="badge badge-warn">⚠ ${secAlerts.length} Security Alert${secAlerts.length>1?'s':''}</span>` : ''}
+        ${bkFailed.length ? `<span class="badge badge-crit">✕ ${bkFailed.length} Backup Failed</span>` : ''}
+      </div>
+      ${r.summaryNotes ? `<div style="margin-top:10px;font-size:12px;color:var(--text-muted);padding:8px 12px;background:var(--surface2);border-radius:4px;border-left:3px solid var(--accent);max-height:60px;overflow:hidden">${r.summaryNotes}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+// ---- DETAIL MODAL ----
+function openDetail(date) {
+  const r = allReports.find(x => x.date === date);
+  if (!r) return;
+  currentModal = r;
+
+  document.getElementById('modal-title').textContent = formatDate(r.date);
+
+  function miniTable(hdrs, rows) {
+    if (!rows?.length) return '<p style="color:var(--text-muted);font-size:12px">No data</p>';
+    const ths = hdrs.map(h=>`<th>${h}</th>`).join('');
+    const trs = (rows||[]).map((row,i) => `<tr style="${i%2===0?'background:var(--surface2)':''}">
+      ${row.map(c => `<td style="padding:5px 8px;border-bottom:1px solid var(--border);font-size:12px;vertical-align:top">${c||'—'}</td>`).join('')}
+    </tr>`).join('');
+    return `<table class="table-editor"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table>`;
+  }
+
+  document.getElementById('modal-body').innerHTML = `
+    <div style="color:var(--text-muted);font-size:12px;margin-bottom:16px">By ${r.preparedBy||'N/A'} · Saved ${r.savedAt ? new Date(r.savedAt).toLocaleString() : 'N/A'}</div>
+    <div style="font-family:var(--mono);font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px">Servers</div>
+    ${miniTable(['Location','Status','Notes'], r.servers)}
+    <div style="font-family:var(--mono);font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.1em;margin:12px 0 6px">Backups</div>
+    ${miniTable(['Location','Status','Notes'], r.backups)}
+    <div style="font-family:var(--mono);font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.1em;margin:12px 0 6px">Security</div>
+    ${miniTable(['Location','Notes'], r.security)}
+    ${r.summaryNotes ? `<div style="font-family:var(--mono);font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.1em;margin:12px 0 6px">Summary</div><div style="background:var(--surface2);border-left:3px solid var(--accent);padding:10px 12px;font-size:12px;color:var(--text-dim);border-radius:0 4px 4px 0;white-space:pre-wrap">${r.summaryNotes}</div>` : ''}
+    ${r.nextActions ? `<div style="font-family:var(--mono);font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.1em;margin:12px 0 6px">Next Actions</div><div style="background:var(--surface2);border-left:3px solid var(--accent2);padding:10px 12px;font-size:12px;color:var(--text-dim);border-radius:0 4px 4px 0;white-space:pre-wrap">${r.nextActions}</div>` : ''}
+  `;
+
+  document.getElementById('detail-modal').classList.add('show');
+}
+
+function closeModal() {
+  document.getElementById('detail-modal').classList.remove('show');
+  currentModal = null;
+}
+
+function loadAndEdit() {
+  if (!currentModal) return;
+  sessionStorage.setItem('load_report', JSON.stringify(currentModal));
+  window.location.href = 'daily.html?load=' + currentModal.date;
+}
+
+function exportModalReport() {
+  if (!currentModal) return;
+  exportReportAsPDF(currentModal);
+}
+
+function deleteModalReport() {
+  if (!currentModal) return;
+  deleteReport(currentModal.date);
+  closeModal();
+}
+
+// ---- DELETE ----
+async function deleteReport(date) {
+  if (!confirm('Delete report for ' + formatDate(date) + '?')) return;
+  deleteLocalReport(date);
+  await deleteFromSheets(date);
+  allReports = allReports.filter(r => r.date !== date);
+  filterReports();
+  showToast('Report deleted');
+}
+
+// ---- EXPORT SINGLE ----
+function exportSinglePDF(date) {
+  const r = allReports.find(x => x.date === date);
+  if (r) exportReportAsPDF(r);
+}
+
+// ---- EXPORT ALL CSV ----
+function exportAllCSV() {
+  if (!allReports.length) { showToast('No reports to export', true); return; }
+  let csv = 'Date,Prepared By,Servers OK,Backups OK,Issues,Security Alerts,Summary\r\n';
+  allReports.forEach(r => {
+    const serversOk = r.servers?.filter(s=>s[1]==='Normal').length||0;
+    const backupsOk = r.backups?.filter(b=>b[1]==='Completed').length||0;
+    const hasIssues = checkIssues(r) ? 'Yes' : 'No';
+    const secA = r.security?.filter(s=>{const n=(s[1]||'').trim().toLowerCase();return n && !['no notes','no alerts','none',''].includes(n);}).length||0;
+    csv += [r.date, r.preparedBy||'', serversOk, backupsOk, hasIssues, secA, `"${(r.summaryNotes||'').replace(/"/g,'""')}"`].join(',') + '\r\n';
+  });
+  downloadDataURI(`IT_Reports_All_${new Date().toISOString().slice(0,10)}.csv`, 'text/csv;charset=utf-8;', csv);
+  showToast('All reports exported as CSV');
+}
+
+// ---- CLEAR ALL ----
+async function clearAll() {
+  if (!confirm('Delete ALL saved reports? This cannot be undone.')) return;
+  localStorage.removeItem('sysadmin_reports');
+  allReports = [];
+  filterReports();
+  showToast('All local reports cleared');
+}
+
+// Close modal on overlay click
+document.getElementById('detail-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+
+// Load on load
+refreshHistory();
+
+// Check if coming from daily.html with a load param (for edit flow)
+const urlParams = new URLSearchParams(window.location.search);
+if (urlParams.get('date')) {
+  window.addEventListener('load', () => openDetail(urlParams.get('date')));
+}
+</script>
+</body>
+</html>

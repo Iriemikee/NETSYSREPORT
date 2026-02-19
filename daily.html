@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Daily Report — SysAdmin Dashboard</title>
+<link rel="stylesheet" href="css/global.css">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<div class="scanlines"></div>
+
+<nav class="navbar">
+  <div class="nav-logo">
+    <div class="nav-logo-icon"><span class="pulse-dot"></span>SD</div>
+    <div>
+      <div class="nav-title">SysAdmin Dashboard</div>
+      <div class="nav-sub" id="nav-clock"></div>
+    </div>
+  </div>
+  <div class="nav-links">
+    <a href="index.html" class="nav-link">Home</a>
+    <a href="daily.html" class="nav-link active">Daily Report</a>
+    <a href="weekly.html" class="nav-link">Weekly Report</a>
+    <a href="history.html" class="nav-link">History</a>
+  </div>
+  <div id="sync-status" class="sync-badge no-sync">● Local Only</div>
+</nav>
+
+<div class="page-layout">
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-heading">Sections</div>
+      <a class="sidebar-item active" onclick="scrollTo('s-meta')"><span class="sidebar-dot"></span> Report Info</a>
+      <a class="sidebar-item" onclick="scrollTo('s-servers')"><span class="sidebar-dot"></span> Server Status</a>
+      <a class="sidebar-item" onclick="scrollTo('s-backups')"><span class="sidebar-dot"></span> Backup Tasks</a>
+      <a class="sidebar-item" onclick="scrollTo('s-security')"><span class="sidebar-dot"></span> Security Alerts</a>
+      <a class="sidebar-item" onclick="scrollTo('s-network')"><span class="sidebar-dot"></span> Network &amp; Infra</a>
+      <a class="sidebar-item" onclick="scrollTo('s-surveillance')"><span class="sidebar-dot"></span> Surveillance</a>
+      <a class="sidebar-item" onclick="scrollTo('s-summary')"><span class="sidebar-dot"></span> Summary</a>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-heading">Recent Reports</div>
+      <div id="recent-list"></div>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <main class="page-main">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Daily <span>Report</span></div>
+        <div class="page-sub">Fill in each section and save — syncs to Google Sheets</div>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-outline btn-sm" onclick="clearForm()">↺ Clear</button>
+        <button class="btn btn-outline btn-sm" onclick="exportCurrentAsPDF()">⬇ PDF</button>
+        <button class="btn btn-primary" onclick="doSave()">✓ Save Report</button>
+      </div>
+    </div>
+
+    <!-- PROGRESS -->
+    <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+
+    <!-- META -->
+    <div class="card" id="s-meta">
+      <div class="card-header">
+        <span class="card-tag">META</span>
+        <span class="card-title">Report Information</span>
+      </div>
+      <div class="field-row">
+        <div>
+          <div class="field-label">Date</div>
+          <input type="date" class="field-input" id="report-date" oninput="updateProgress()">
+        </div>
+        <div>
+          <div class="field-label">Prepared By</div>
+          <input type="text" class="field-input" id="report-by" placeholder="e.g. Michael Marsh" oninput="updateProgress()">
+        </div>
+      </div>
+    </div>
+
+    <!-- SERVERS -->
+    <div class="card" id="s-servers">
+      <div class="card-header">
+        <span class="card-tag">1A</span>
+        <span class="card-title">Server Status — Morning Check</span>
+      </div>
+      <table class="table-editor" id="server-table">
+        <thead><tr><th>Location</th><th>Uptime Status</th><th>Notes / Actions</th></tr></thead>
+        <tbody>
+          <tr><td class="row-label">Automotive Art</td><td><select class="status-select" onchange="updateProgress()"><option>Normal</option><option>Warning</option><option>Critical</option><option>Offline</option></select></td><td><input class="cell-input" placeholder="Notes..."></td></tr>
+          <tr><td class="row-label">Buccaneer Beach Club</td><td><select class="status-select" onchange="updateProgress()"><option>Normal</option><option>Warning</option><option>Critical</option><option>Offline</option></select></td><td><input class="cell-input" placeholder="Notes..."></td></tr>
+          <tr><td class="row-label">TropicWear</td><td><select class="status-select" onchange="updateProgress()"><option>Normal</option><option>Warning</option><option>Critical</option><option>Offline</option></select></td><td><input class="cell-input" placeholder="Notes..."></td></tr>
+        </tbody>
+      </table>
+      <div style="margin-top:10px"><button class="btn btn-outline btn-sm" onclick="addRow('server-table',['loc','select-server','notes'])">+ Add Location</button></div>
+    </div>
+
+    <!-- BACKUPS -->
+    <div class="card" id="s-backups">
+      <div class="card-header">
+        <span class="card-tag">1B</span>
+        <span class="card-title">Backup Tasks Completed</span>
+      </div>
+      <table class="table-editor" id="backup-table">
+        <thead><tr><th>Location / Task</th><th>Backup Status</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td class="row-label">(LOCAL) Automotive Art</td><td><select class="status-select" onchange="updateProgress()"><option>Completed</option><option>Failed</option><option>Pending</option><option>Skipped</option></select></td><td><input class="cell-input" placeholder="Notes..."></td></tr>
+          <tr><td class="row-label">(Site-to-Site) Automotive → Outdoor World</td><td><select class="status-select" onchange="updateProgress()"><option>Completed</option><option>Failed</option><option>Pending</option><option>Skipped</option></select></td><td><input class="cell-input" placeholder="Notes..."></td></tr>
+          <tr><td class="row-label">(LOCAL) Buccaneer Beach Club</td><td><select class="status-select" onchange="updateProgress()"><option>Completed</option><option>Failed</option><option>Pending</option><option>Skipped</option></select></td><td><input class="cell-input" placeholder="Notes..."></td></tr>
+          <tr><td class="row-label">(Site-to-Site) Buccaneer → Automotive</td><td><select class="status-select" onchange="updateProgress()"><option>Completed</option><option>Failed</option><option>Pending</option><option>Skipped</option></select></td><td><input class="cell-input" placeholder="Notes..."></td></tr>
+          <tr><td class="row-label">(LOCAL) TropicWear</td><td><select class="status-select" onchange="updateProgress()"><option>Completed</option><option>Failed</option><option>Pending</option><option>Skipped</option></select></td><td><input class="cell-input" placeholder="Notes..."></td></tr>
+          <tr><td class="row-label">(Site-to-Site) TropicWear → Automotive Art</td><td><select class="status-select" onchange="updateProgress()"><option>Completed</option><option>Failed</option><option>Pending</option><option>Skipped</option></select></td><td><input class="cell-input" placeholder="Notes..."></td></tr>
+        </tbody>
+      </table>
+      <div style="margin-top:10px"><button class="btn btn-outline btn-sm" onclick="addRow('backup-table',['loc','select-backup','notes'])">+ Add Task</button></div>
+    </div>
+
+    <!-- SECURITY -->
+    <div class="card" id="s-security">
+      <div class="card-header">
+        <span class="card-tag">1C</span>
+        <span class="card-title">Security Alerts / Logs — Overnight Review</span>
+      </div>
+      <table class="table-editor" id="security-table">
+        <thead><tr><th>Location / Host</th><th>Notes / Alerts</th></tr></thead>
+        <tbody>
+          <tr><td class="row-label">Buccaneer Beach Club</td><td><input class="cell-input" placeholder="Notes..."></td></tr>
+          <tr><td class="row-label">TropicWear</td><td><input class="cell-input" placeholder="Notes..."></td></tr>
+          <tr><td class="row-label">Automotive Art H1</td><td><input class="cell-input" placeholder="Notes..."></td></tr>
+          <tr><td class="row-label">Automotive Art H2</td><td><input class="cell-input" placeholder="Notes..."></td></tr>
+        </tbody>
+      </table>
+      <div style="margin-top:10px"><button class="btn btn-outline btn-sm" onclick="addRow('security-table',['loc','notes'])">+ Add Row</button></div>
+    </div>
+
+    <!-- NETWORK -->
+    <div class="card" id="s-network">
+      <div class="card-header">
+        <span class="card-tag">2</span>
+        <span class="card-title">Network &amp; Infrastructure</span>
+      </div>
+      <table class="table-editor" id="network-table">
+        <thead><tr><th>Task</th><th>Location</th><th>Status</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td class="row-label">Firewall Operation</td><td><input class="cell-input" value="All Locations"></td><td><select class="status-select" onchange="updateProgress()"><option>Normal</option><option>Warning</option><option>Critical</option><option>Offline</option></select></td><td><input class="cell-input" placeholder="Notes..."></td></tr>
+          <tr><td class="row-label">Gateway Status</td><td><input class="cell-input" value="All Locations"></td><td><select class="status-select" onchange="updateProgress()"><option>Verified</option><option>Warning</option><option>Critical</option><option>Offline</option></select></td><td><input class="cell-input" placeholder="Notes..."></td></tr>
+          <tr><td class="row-label">Wi-Fi Access Points</td><td><input class="cell-input" value="All Locations"></td><td><select class="status-select" onchange="updateProgress()"><option>Confirmed</option><option>Partial</option><option>Down</option></select></td><td><input class="cell-input" placeholder="Notes..."></td></tr>
+          <tr><td class="row-label">Camera / NVR Status</td><td><input class="cell-input" value="All Locations"></td><td><select class="status-select" onchange="updateProgress()"><option>Verified</option><option>Warning</option><option>Critical</option><option>Offline</option></select></td><td><input class="cell-input" placeholder="Notes..."></td></tr>
+        </tbody>
+      </table>
+      <div style="margin-top:10px"><button class="btn btn-outline btn-sm" onclick="addNetworkRow()">+ Add Task</button></div>
+    </div>
+
+    <!-- SURVEILLANCE -->
+    <div class="card" id="s-surveillance">
+      <div class="card-header">
+        <span class="card-tag">3</span>
+        <span class="card-title">Surveillance</span>
+      </div>
+      <table class="table-editor" id="surveillance-table">
+        <thead><tr><th>Location</th><th>Notes / Alerts</th></tr></thead>
+        <tbody>
+          <tr><td class="row-label">Buccaneer Beach Club</td><td><input class="cell-input" placeholder="Notes..."></td></tr>
+          <tr><td class="row-label">TropicWear</td><td><input class="cell-input" placeholder="Notes..."></td></tr>
+          <tr><td class="row-label">Automotive Art</td><td><input class="cell-input" placeholder="Notes..."></td></tr>
+          <tr><td class="row-label">Parham Marina</td><td><input class="cell-input" placeholder="Notes..."></td></tr>
+          <tr><td class="row-label">Distribution Division Grey Building</td><td><input class="cell-input" placeholder="Notes..."></td></tr>
+          <tr><td class="row-label">Outdoor World Ltd</td><td><input class="cell-input" placeholder="Notes..."></td></tr>
+        </tbody>
+      </table>
+      <div style="margin-top:10px"><button class="btn btn-outline btn-sm" onclick="addRow('surveillance-table',['loc','notes'])">+ Add Location</button></div>
+    </div>
+
+    <!-- SUMMARY -->
+    <div class="card" id="s-summary">
+      <div class="card-header">
+        <span class="card-tag">4</span>
+        <span class="card-title">Summary / Next Actions</span>
+      </div>
+      <div class="field-full">
+        <div class="field-label">Summary Notes</div>
+        <textarea class="field-input" id="summary-notes" rows="4" placeholder="Brief summary of today's activities, issues, and resolutions..." oninput="updateProgress()"></textarea>
+      </div>
+      <div class="field-full">
+        <div class="field-label">Next Actions / Follow-ups</div>
+        <textarea class="field-input" id="next-actions" rows="4" placeholder="Pending items and follow-ups for tomorrow..." oninput="updateProgress()"></textarea>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-primary" onclick="doSave()">✓ Save &amp; Complete Report</button>
+        <button class="btn btn-outline" onclick="exportCurrentAsPDF()">⬇ Export PDF</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="js/global.js"></script>
+<script>
+// ---- INIT ----
+document.getElementById('report-date').value = todayStr();
+
+// Load saved preparedBy
+const prev = getLocalReports()[0];
+if (prev?.preparedBy) document.getElementById('report-by').value = prev.preparedBy;
+
+// Auto-load today if exists
+const todayReport = getLocalReports().find(r => r.date === todayStr());
+if (todayReport) loadFormData(todayReport);
+
+renderRecentList();
+updateSyncStatus();
+
+// ---- SCROLL ----
+function scrollTo(id) {
+  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ---- PROGRESS ----
+function updateProgress() {
+  const inputs = document.querySelectorAll('.page-main input[type=text], .page-main input[type=date], .page-main textarea');
+  let filled = 0;
+  inputs.forEach(el => { if (el.value.trim()) filled++; });
+  const pct = Math.min(100, Math.round((filled / Math.max(inputs.length, 1)) * 100));
+  document.getElementById('progress-fill').style.width = pct + '%';
+}
+
+// ---- COLLECT FORM ----
+function collectForm() {
+  return {
+    date: document.getElementById('report-date').value,
+    preparedBy: document.getElementById('report-by').value,
+    servers: collectTable('server-table'),
+    backups: collectTable('backup-table'),
+    security: collectTable('security-table'),
+    network: collectTable('network-table'),
+    surveillance: collectTable('surveillance-table'),
+    summaryNotes: document.getElementById('summary-notes').value,
+    nextActions: document.getElementById('next-actions').value,
+    savedAt: new Date().toISOString()
+  };
+}
+
+// ---- LOAD FORM ----
+function loadFormData(data) {
+  document.getElementById('report-date').value = data.date || '';
+  document.getElementById('report-by').value = data.preparedBy || '';
+  loadTable('server-table', data.servers, [
+    {type:'label'},{type:'select',options:['Normal','Warning','Critical','Offline']},{type:'text',placeholder:'Notes...'}
+  ]);
+  loadTable('backup-table', data.backups, [
+    {type:'label'},{type:'select',options:['Completed','Failed','Pending','Skipped']},{type:'text',placeholder:'Notes...'}
+  ]);
+  loadTable('security-table', data.security, [{type:'label'},{type:'text',placeholder:'Notes...'}]);
+  loadTable('network-table', data.network, [
+    {type:'label'},{type:'text',placeholder:'Location'},{type:'select',options:['Normal','Warning','Critical','Verified','Confirmed','Partial','Down','Offline']},{type:'text',placeholder:'Notes...'}
+  ]);
+  loadTable('surveillance-table', data.surveillance, [{type:'label'},{type:'text',placeholder:'Notes...'}]);
+  document.getElementById('summary-notes').value = data.summaryNotes || '';
+  document.getElementById('next-actions').value = data.nextActions || '';
+  updateProgress();
+}
+
+// ---- SAVE ----
+async function doSave() {
+  const data = collectForm();
+  if (!data.date) { showToast('Please set a date first!', true); return; }
+  document.querySelector('.btn-primary').textContent = '⏳ Saving...';
+  await saveReport(data, (stage) => {
+    if (stage === 'local') renderRecentList();
+  });
+  document.querySelector('.btn-primary').textContent = '✓ Save Report';
+  updateSyncStatus();
+}
+
+// ---- CLEAR ----
+function clearForm() {
+  if (!confirm('Clear the form? Unsaved changes will be lost.')) return;
+  document.querySelectorAll('.page-main input[type=text], .page-main textarea').forEach(el => el.value = '');
+  document.querySelectorAll('.page-main select').forEach(el => el.selectedIndex = 0);
+  document.getElementById('report-date').value = todayStr();
+  updateProgress();
+}
+
+// ---- EXPORT ----
+function exportCurrentAsPDF() {
+  const data = collectForm();
+  if (!data.date) { showToast('Fill in the date first!', true); return; }
+  exportReportAsPDF(data);
+}
+
+// ---- ADD ROWS ----
+function addRow(tableId, cols) {
+  const tbody = document.querySelector(`#${tableId} tbody`);
+  const tr = document.createElement('tr');
+  cols.forEach((col, i) => {
+    const td = document.createElement('td');
+    if (col === 'loc') {
+      const inp = document.createElement('input');
+      inp.className = 'cell-input row-label-input';
+      inp.placeholder = 'Location...';
+      inp.style.fontFamily = 'var(--mono)'; inp.style.fontSize = '11px'; inp.style.color = 'var(--text-dim)';
+      td.appendChild(inp);
+    } else if (col === 'select-server') {
+      const sel = document.createElement('select'); sel.className = 'status-select';
+      ['Normal','Warning','Critical','Offline'].forEach(o => { const opt = document.createElement('option'); opt.value=o; opt.textContent=o; sel.appendChild(opt); });
+      td.appendChild(sel);
+    } else if (col === 'select-backup') {
+      const sel = document.createElement('select'); sel.className = 'status-select';
+      ['Completed','Failed','Pending','Skipped'].forEach(o => { const opt = document.createElement('option'); opt.value=o; opt.textContent=o; sel.appendChild(opt); });
+      td.appendChild(sel);
+    } else {
+      const inp = document.createElement('input'); inp.className = 'cell-input'; inp.placeholder = 'Notes...'; td.appendChild(inp);
+    }
+    tr.appendChild(td);
+  });
+  tbody.appendChild(tr);
+}
+
+function addNetworkRow() {
+  const tbody = document.querySelector('#network-table tbody');
+  const tr = document.createElement('tr');
+  ['Task','Location','status','Notes'].forEach((c, i) => {
+    const td = document.createElement('td');
+    if (c === 'status') {
+      const sel = document.createElement('select'); sel.className = 'status-select';
+      ['Normal','Warning','Critical','Verified','Confirmed','Partial','Down','Offline'].forEach(o => { const opt = document.createElement('option'); opt.value=o; opt.textContent=o; sel.appendChild(opt); });
+      td.appendChild(sel);
+    } else {
+      const inp = document.createElement('input'); inp.className = 'cell-input'; inp.placeholder = c + '...'; td.appendChild(inp);
+    }
+    tr.appendChild(td);
+  });
+  tbody.appendChild(tr);
+}
+
+// ---- RECENT LIST (sidebar) ----
+function renderRecentList() {
+  const el = document.getElementById('recent-list');
+  const reports = getLocalReports().slice(0, 8);
+  el.innerHTML = reports.length ? reports.map(r => `
+    <a class="sidebar-item done" onclick="loadFormData(${JSON.stringify(r).replace(/'/g,'&#39;')})">
+      <span class="sidebar-dot"></span>
+      <span style="font-size:11px">${formatDateShort(r.date)}</span>
+    </a>`).join('') : '<div style="font-size:11px;color:var(--text-muted);padding:4px 10px">No saved reports</div>';
+}
+
+// ---- SYNC STATUS ----
+function updateSyncStatus() {
+  const el = document.getElementById('sync-status');
+  if (getSheetsUrl()) {
+    el.className = 'sync-badge synced'; el.textContent = '● Sheets Synced';
+  } else {
+    el.className = 'sync-badge no-sync'; el.textContent = '● Local Only';
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Settings — SysAdmin Dashboard</title>
+<link rel="stylesheet" href="css/global.css">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<div class="scanlines"></div>
+
+<nav class="navbar">
+  <div class="nav-logo">
+    <div class="nav-logo-icon"><span class="pulse-dot"></span>SD</div>
+    <div>
+      <div class="nav-title">SysAdmin Dashboard</div>
+      <div class="nav-sub" id="nav-clock"></div>
+    </div>
+  </div>
+  <div class="nav-links">
+    <a href="index.html" class="nav-link">Home</a>
+    <a href="daily.html" class="nav-link">Daily Report</a>
+    <a href="weekly.html" class="nav-link">Weekly Report</a>
+    <a href="history.html" class="nav-link">History</a>
+  </div>
+</nav>
+
+<div class="page-layout">
+  <main class="page-main" style="margin-left:0;max-width:760px">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Settings &amp; <span>Setup</span></div>
+        <div class="page-sub">Connect Google Sheets for permanent cross-device report history</div>
+      </div>
+    </div>
+
+    <!-- STEP 1 -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-tag">STEP 1</span>
+        <span class="card-title">Create Your Google Sheet</span>
+      </div>
+      <ol style="line-height:2;color:var(--text-dim);font-size:13px;padding-left:20px">
+        <li>Go to <a href="https://sheets.google.com" target="_blank" style="color:var(--accent)">sheets.google.com</a> and create a new spreadsheet</li>
+        <li>Name it <strong style="color:var(--text)">IT SysAdmin Reports</strong></li>
+        <li>In the first row, add these headers in columns A–I:<br>
+          <code style="background:var(--surface2);padding:4px 10px;border-radius:4px;font-family:var(--mono);font-size:11px;color:var(--accent)">date | preparedBy | servers | backups | security | network | surveillance | summaryNotes | nextActions</code>
+        </li>
+      </ol>
+    </div>
+
+    <!-- STEP 2 -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-tag">STEP 2</span>
+        <span class="card-title">Create a Google Apps Script Web App</span>
+      </div>
+      <ol style="line-height:2;color:var(--text-dim);font-size:13px;padding-left:20px;margin-bottom:16px">
+        <li>In your Google Sheet, go to <strong style="color:var(--text)">Extensions → Apps Script</strong></li>
+        <li>Delete the default code and paste the code below</li>
+        <li>Click <strong style="color:var(--text)">Save</strong>, then <strong style="color:var(--text)">Deploy → New Deployment</strong></li>
+        <li>Set type to <strong style="color:var(--text)">Web App</strong></li>
+        <li>Set <strong style="color:var(--text)">"Execute as"</strong> → Me, and <strong style="color:var(--text)">"Who has access"</strong> → Anyone</li>
+        <li>Click <strong style="color:var(--text)">Deploy</strong> and copy the Web App URL</li>
+      </ol>
+
+      <div style="position:relative">
+        <div style="background:var(--bg);border:1px solid var(--border2);border-radius:6px;padding:16px;font-family:var(--mono);font-size:11px;color:var(--accent2);line-height:1.8;overflow-x:auto;max-height:320px;overflow-y:auto" id="script-code">
+const SHEET_NAME = 'Sheet1';
+
+function doPost(e) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(SHEET_NAME);
+    const body = JSON.parse(e.postData.contents);
+
+    if (body.action === 'save') {
+      const d = body.data;
+      // Find existing row for this date
+      const data = sheet.getDataRange().getValues();
+      let rowIdx = -1;
+      for (let i = 1; i < data.length; i++) {
+        if (data[i][0] === d.date) { rowIdx = i + 1; break; }
+      }
+      const row = [
+        d.date,
+        d.preparedBy || '',
+        JSON.stringify(d.servers || []),
+        JSON.stringify(d.backups || []),
+        JSON.stringify(d.security || []),
+        JSON.stringify(d.network || []),
+        JSON.stringify(d.surveillance || []),
+        d.summaryNotes || '',
+        d.nextActions || '',
+        d.savedAt || new Date().toISOString()
+      ];
+      if (rowIdx > 0) {
+        sheet.getRange(rowIdx, 1, 1, row.length).setValues([row]);
+      } else {
+        sheet.appendRow(row);
+      }
+      return ContentService.createTextOutput(JSON.stringify({ok:true}))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (body.action === 'delete') {
+      const data = sheet.getDataRange().getValues();
+      for (let i = 1; i < data.length; i++) {
+        if (data[i][0] === body.date) { sheet.deleteRow(i + 1); break; }
+      }
+      return ContentService.createTextOutput(JSON.stringify({ok:true}))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+  } catch(err) {
+    return ContentService.createTextOutput(JSON.stringify({ok:false,error:err.toString()}))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function doGet(e) {
+  const action = e.parameter.action;
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEET_NAME);
+
+  if (action === 'getAll') {
+    const data = sheet.getDataRange().getValues();
+    const reports = [];
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      if (!row[0]) continue;
+      try {
+        reports.push({
+          date: row[0],
+          preparedBy: row[1],
+          servers: JSON.parse(row[2] || '[]'),
+          backups: JSON.parse(row[3] || '[]'),
+          security: JSON.parse(row[4] || '[]'),
+          network: JSON.parse(row[5] || '[]'),
+          surveillance: JSON.parse(row[6] || '[]'),
+          summaryNotes: row[7],
+          nextActions: row[8],
+          savedAt: row[9]
+        });
+      } catch(e) {}
+    }
+    reports.sort((a,b) => b.date.localeCompare(a.date));
+    return ContentService.createTextOutput(JSON.stringify({data: reports}))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  return ContentService.createTextOutput(JSON.stringify({ok:true,status:'SysAdmin Dashboard API'}))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+        </div>
+        <button class="btn btn-outline btn-sm" style="position:absolute;top:10px;right:10px" onclick="copyScript()">Copy</button>
+      </div>
+    </div>
+
+    <!-- STEP 3 -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-tag">STEP 3</span>
+        <span class="card-title">Paste Your Web App URL Here</span>
+      </div>
+      <div class="field-full">
+        <div class="field-label">Google Apps Script Web App URL</div>
+        <input type="url" class="field-input" id="sheets-url" placeholder="https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec">
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-primary" onclick="saveUrl()">✓ Save &amp; Connect</button>
+        <button class="btn btn-outline" onclick="testConnection()">⚡ Test Connection</button>
+        <button class="btn btn-danger" onclick="clearUrl()">✕ Disconnect</button>
+      </div>
+      <div id="connection-status" style="margin-top:12px;font-family:var(--mono);font-size:12px"></div>
+    </div>
+
+    <!-- STATUS -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-tag">STATUS</span>
+        <span class="card-title">Connection Status</span>
+      </div>
+      <div id="status-display" style="font-family:var(--mono);font-size:13px;color:var(--text-dim)">Loading...</div>
+    </div>
+
+  </main>
+</div>
+
+<script src="js/global.js"></script>
+<script>
+// Load current URL
+const currentUrl = getSheetsUrl();
+if (currentUrl) document.getElementById('sheets-url').value = currentUrl;
+updateStatusDisplay();
+
+function saveUrl() {
+  const url = document.getElementById('sheets-url').value.trim();
+  if (!url) { showToast('Please enter a URL', true); return; }
+  if (!url.startsWith('https://script.google.com')) {
+    showToast('URL must be a Google Apps Script URL', true); return;
+  }
+  localStorage.setItem('sheets_url', url);
+  showToast('URL saved! Reports will now sync to Google Sheets.');
+  updateStatusDisplay();
+}
+
+function clearUrl() {
+  if (!confirm('Disconnect Google Sheets? Reports will only be saved locally.')) return;
+  localStorage.removeItem('sheets_url');
+  document.getElementById('sheets-url').value = '';
+  showToast('Disconnected from Google Sheets');
+  updateStatusDisplay();
+}
+
+async function testConnection() {
+  const url = document.getElementById('sheets-url').value.trim();
+  if (!url) { showToast('Enter a URL first', true); return; }
+  const el = document.getElementById('connection-status');
+  el.style.color = 'var(--accent)';
+  el.textContent = '⏳ Testing connection...';
+  try {
+    const res = await fetch(url + '?action=ping');
+    if (res.ok) {
+      el.style.color = 'var(--accent2)';
+      el.textContent = '✓ Connection successful! Google Sheets is reachable.';
+    } else {
+      el.style.color = 'var(--warn)';
+      el.textContent = '⚠ Got HTTP ' + res.status + ' — check your script deployment settings.';
+    }
+  } catch(e) {
+    el.style.color = 'var(--warn)';
+    el.textContent = '⚠ Connection failed: ' + e.message + ' — make sure the script is deployed as a Web App with "Anyone" access.';
+  }
+}
+
+function updateStatusDisplay() {
+  const url = getSheetsUrl();
+  const el = document.getElementById('status-display');
+  const localCount = getLocalReports().length;
+  if (url) {
+    el.innerHTML = `<span class="badge badge-ok" style="font-size:12px">● Connected</span><br><br>
+      <span style="color:var(--text-muted)">URL:</span> <span style="color:var(--accent);word-break:break-all">${url}</span><br><br>
+      <span style="color:var(--text-muted)">Local reports cached:</span> <span style="color:var(--text)">${localCount}</span>`;
+  } else {
+    el.innerHTML = `<span class="badge badge-warn" style="font-size:12px">● Not Connected</span><br><br>
+      <span style="color:var(--text-muted)">Reports are saved locally only (${localCount} stored).<br>Connect Google Sheets to sync across devices.</span>`;
+  }
+}
+
+function copyScript() {
+  const code = document.getElementById('script-code').textContent;
+  navigator.clipboard.writeText(code).then(() => showToast('Script copied to clipboard!'));
+}
+</script>
+</body>
+</html>
